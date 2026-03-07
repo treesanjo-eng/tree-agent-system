@@ -18,8 +18,8 @@ export const searchKnowledge = async (query: string): Promise<string> => {
         const { data: documents, error } = await supabaseClient
             .rpc('match_knowledge', {
                 query_embedding: queryEmbedding,
-                match_threshold: 0.75,
-                match_count: 3
+                match_threshold: 0.60, // 以前の0.75から緩和
+                match_count: 5         // 短いチャンクになったため取得件数を増やす
             });
 
         if (error) throw error;

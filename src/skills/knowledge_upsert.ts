@@ -11,18 +11,24 @@ export const upsertKnowledge = async (knowledgeText: string): Promise<void> => {
 
     try {
         console.log(`[RAG] Embedding new knowledge...`);
-        const embedding = await generateEmbedding(`passage: ${knowledgeText}`);
+        // 空行（段落）ごとにテキストをチャンク分割する
+        const chunks = knowledgeText.split(/\n\s*\n/).map(c => c.trim()).filter(c => c.length > 0);
+        console.log(`[RAG] Split knowledge into ${chunks.length} chunks.`);
 
-        const { error } = await supabaseClient
-            .from('company_knowledge')
-            .insert({
-                text_content: knowledgeText,
-                embedding: embedding
-            });
+        for (const chunk of chunks) {
+            const embedding = await generateEmbedding(`passage: ${chunk}`);
 
-        if (error) throw error;
+            const { error } = await supabaseClient
+                .from('company_knowledge')
+                .insert({
+                    text_content: chunk,
+                    embedding: embedding
+                });
 
-        console.log(`[KNOWLEDGE] Successfully saved new vector rule to Supabase.`);
+            if (error) throw error;
+        }
+
+        console.log(`[KNOWLEDGE] Successfully saved ${chunks.length} vector chunks to Supabase.`);
 
     } catch (e) {
         console.error('[Knowledge Upsert Error]', e);
