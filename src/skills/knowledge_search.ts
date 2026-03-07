@@ -30,13 +30,13 @@ export const searchKnowledge = async (query: string): Promise<string> => {
         const seenTexts = new Set<string>();
 
         for (const keyword of keywords) {
-            if (keyword.length < 2) continue;
+            if (keyword.length < 1) continue;
 
             const { data, error } = await supabaseClient
                 .from('company_knowledge')
                 .select('text_content')
                 .ilike('text_content', `%${keyword}%`)
-                .limit(5);
+                .limit(10);
 
             if (error) {
                 console.error(`[RAG] Search error for keyword "${keyword}":`, error);
@@ -61,8 +61,8 @@ export const searchKnowledge = async (query: string): Promise<string> => {
         // マッチ数が多い順にソート
         allResults.sort((a, b) => b.match_count - a.match_count);
 
-        // 上位5件を取得
-        const topResults = allResults.slice(0, 5);
+        // 上位8件を取得（複数セクションにまたがるマニュアルに対応）
+        const topResults = allResults.slice(0, 8);
 
         console.log(`[RAG] Total unique results: ${topResults.length}`);
 
@@ -106,11 +106,11 @@ function extractJapaneseKeywords(query: string): string[] {
     // Step 3: 助詞「の」「は」「が」「を」「に」「で」「と」「も」「へ」で分割
     cleaned = cleaned.replace(/(の|は|が|を|に|で|と|も|へ|か|や)/g, '|');
 
-    // Step 4: 分割して短すぎるものを除外
+    // Step 4: 分割して空文字を除外（漢字1文字でも有効なキーワードとして扱う）
     const keywords = cleaned
         .split('|')
         .map(w => w.trim())
-        .filter(w => w.length >= 2);
+        .filter(w => w.length >= 1);
 
     return [...new Set(keywords)]; // 重複を除去
 }
