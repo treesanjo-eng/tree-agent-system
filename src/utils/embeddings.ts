@@ -8,9 +8,11 @@ let extractor: any = null;
  */
 const getExtractor = async () => {
     if (!extractor) {
+        console.log('[EMBEDDING] Loading multilingual-e5-small model...');
         extractor = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small', {
             quantized: true,
         });
+        console.log('[EMBEDDING] Model loaded successfully!');
     }
     return extractor;
 };
