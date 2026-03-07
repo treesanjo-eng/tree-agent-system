@@ -103,8 +103,8 @@ function extractJapaneseKeywords(query: string): string[] {
         cleaned = cleaned.split(pattern).join('|');
     }
 
-    // Step 3: 助詞「の」「は」「が」「を」「に」「で」「と」「も」「へ」で分割
-    cleaned = cleaned.replace(/(の|は|が|を|に|で|と|も|へ|か|や)/g, '|');
+    // Step 3: 助詞・疑問詞で分割
+    cleaned = cleaned.replace(/(の|は|が|を|に|で|と|も|へ|か|や|何|どの|どんな)/g, '|');
 
     // Step 4: 分割して空文字を除外（漢字1文字でも有効なキーワードとして扱う）
     const keywords = cleaned
