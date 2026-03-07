@@ -10,7 +10,7 @@ export const executeConfidenceHook = async (
     confidenceScore: number
 ): Promise<boolean> => {
 
-    const THRESHOLD = 0.8; // 80% confidence required
+    const THRESHOLD = 0.7; // 70% confidence required (以前は0.8でしたが、少し緩和します)
 
     if (confidenceScore < THRESHOLD) {
         console.warn(`Confidence too low (${(confidenceScore * 100).toFixed(1)}%). Escalating to CEO...`);
