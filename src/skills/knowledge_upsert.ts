@@ -1,8 +1,8 @@
 import { supabaseClient } from '../mcp/supabase';
-import { generateEmbedding } from '../utils/embeddings';
 
 /**
- * 代表からの /learn コマンドを受け取り、ベクトル化してSupabaseに保存します。
+ * 代表からの /learn コマンドを受け取り、チャンキングしてSupabaseに保存します。
+ * ベクトル埋め込みは不要（テキスト検索に切り替え済み）。
  */
 export const upsertKnowledge = async (knowledgeText: string): Promise<void> => {
     if (!supabaseClient) {
@@ -10,7 +10,7 @@ export const upsertKnowledge = async (knowledgeText: string): Promise<void> => {
     }
 
     try {
-        console.log(`[RAG] Embedding new knowledge...`);
+        console.log(`[RAG] Processing new knowledge...`);
         // 空行（段落）ごとにテキストをチャンク分割する
         const rawChunks = knowledgeText.split(/\n\s*\n/).map(c => c.trim()).filter(c => c.length > 0);
 
@@ -41,19 +41,18 @@ export const upsertKnowledge = async (knowledgeText: string): Promise<void> => {
         console.log(`[RAG] Split knowledge into ${contextualChunks.length} contextual chunks.`);
 
         for (const chunk of contextualChunks) {
-            const embedding = await generateEmbedding(`passage: ${chunk}`);
-
+            // ベクトル埋め込みなしでテキストのみ保存
+            // embedding カラムはNULLableにしておく（既存データとの互換性維持）
             const { error } = await supabaseClient
                 .from('company_knowledge')
                 .insert({
                     text_content: chunk,
-                    embedding: embedding
                 });
 
             if (error) throw error;
         }
 
-        console.log(`[KNOWLEDGE] Successfully saved ${contextualChunks.length} vector chunks to Supabase.`);
+        console.log(`[KNOWLEDGE] Successfully saved ${contextualChunks.length} chunks to Supabase.`);
 
     } catch (e) {
         console.error('[Knowledge Upsert Error]', e);

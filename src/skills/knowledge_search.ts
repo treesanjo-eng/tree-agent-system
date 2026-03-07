@@ -1,9 +1,10 @@
 import { supabaseClient } from '../mcp/supabase';
-import { generateEmbedding } from '../utils/embeddings';
 
 /**
- * 簡易版ナレッジ検索（ベクトルRAG版）
- * 質問文をベクトルに変換し、Supabaseの pgvector から上位3件の関連知識を取得します。
+ * ナレッジ検索（テキスト検索版）
+ * ベクトル検索の代わりにPostgreSQLのテキスト検索を使用。
+ * Railwayのメモリ制限(1GB)では埋め込みモデルが動作しないため、
+ * シンプルかつ確実なILIKE検索に切り替えました。
  */
 export const searchKnowledge = async (query: string): Promise<string> => {
     if (!supabaseClient) {
@@ -12,31 +13,104 @@ export const searchKnowledge = async (query: string): Promise<string> => {
     }
 
     try {
-        console.log(`[RAG] Generating embedding for query: "${query}"...`);
-        const queryEmbedding = await generateEmbedding(`query: ${query}`);
+        console.log(`[RAG] Searching knowledge for: "${query}"...`);
 
-        const { data: documents, error } = await supabaseClient
-            .rpc('match_knowledge', {
-                query_embedding: queryEmbedding,
-                match_threshold: 0.60, // 以前の0.75から緩和
-                match_count: 5         // 短いチャンクになったため取得件数を増やす
-            });
+        // 日本語の質問から重要なキーワードを抽出する
+        const keywords = extractJapaneseKeywords(query);
 
-        if (error) throw error;
+        console.log(`[RAG] Extracted keywords: ${JSON.stringify(keywords)}`);
 
-        if (!documents || documents.length === 0) {
+        if (keywords.length === 0) {
+            console.log('[RAG] No keywords extracted. Using full query.');
+            keywords.push(query.substring(0, 10));
+        }
+
+        // 各キーワードで個別にILIKE検索し、結果をマージ
+        const allResults: { text_content: string; match_count: number }[] = [];
+        const seenTexts = new Set<string>();
+
+        for (const keyword of keywords) {
+            if (keyword.length < 2) continue;
+
+            const { data, error } = await supabaseClient
+                .from('company_knowledge')
+                .select('text_content')
+                .ilike('text_content', `%${keyword}%`)
+                .limit(5);
+
+            if (error) {
+                console.error(`[RAG] Search error for keyword "${keyword}":`, error);
+                continue;
+            }
+
+            console.log(`[RAG] Keyword "${keyword}" matched ${data?.length || 0} records.`);
+
+            if (data) {
+                for (const row of data) {
+                    if (!seenTexts.has(row.text_content)) {
+                        seenTexts.add(row.text_content);
+                        allResults.push({ text_content: row.text_content, match_count: 1 });
+                    } else {
+                        const existing = allResults.find(r => r.text_content === row.text_content);
+                        if (existing) existing.match_count++;
+                    }
+                }
+            }
+        }
+
+        // マッチ数が多い順にソート
+        allResults.sort((a, b) => b.match_count - a.match_count);
+
+        // 上位5件を取得
+        const topResults = allResults.slice(0, 5);
+
+        console.log(`[RAG] Total unique results: ${topResults.length}`);
+
+        if (topResults.length === 0) {
             return '';
         }
 
         let combinedKnowledge = '';
-        for (const doc of documents) {
-            combinedKnowledge += `\n--- [ナレッジソース (関連度: ${(doc.similarity * 100).toFixed(1)}%)] ---\n${doc.text_content}\n`;
+        for (const result of topResults) {
+            combinedKnowledge += `\n--- [ナレッジソース] ---\n${result.text_content}\n`;
         }
 
         return combinedKnowledge;
 
     } catch (e) {
-        console.error('[Knowledge Search API/DB Error]', e);
+        console.error('[Knowledge Search Error]', e);
         return '';
     }
 };
+
+/**
+ * 日本語テキストからキーワードを抽出する。
+ * 形態素解析ライブラリを使わず、パターンベースで分割する。
+ */
+function extractJapaneseKeywords(query: string): string[] {
+    // Step 1: 記号を除去
+    let cleaned = query.replace(/[？?！!。、,.・「」『』（）\(\)\s～〜]+/g, '');
+
+    // Step 2: 一般的な助詞・助動詞・疑問詞パターンで分割
+    const splitPatterns = [
+        'について', 'ください', 'してほしい', 'を教えて', 'を教え',
+        'って何', 'とは何', 'はいつ', 'はどこ', 'はなに', 'はどう',
+        'したい', 'すべき', 'ですか', 'ますか', '教えて', 'ほしい',
+        'だワン', 'ワン', 'けばいいの', 'ればいいの', 'たらいいの',
+        'ってどう', 'やるの', 'って',
+    ];
+    for (const pattern of splitPatterns) {
+        cleaned = cleaned.split(pattern).join('|');
+    }
+
+    // Step 3: 助詞「の」「は」「が」「を」「に」「で」「と」「も」「へ」で分割
+    cleaned = cleaned.replace(/(の|は|が|を|に|で|と|も|へ|か|や)/g, '|');
+
+    // Step 4: 分割して短すぎるものを除外
+    const keywords = cleaned
+        .split('|')
+        .map(w => w.trim())
+        .filter(w => w.length >= 2);
+
+    return [...new Set(keywords)]; // 重複を除去
+}
