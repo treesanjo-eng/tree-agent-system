@@ -3,6 +3,7 @@ import { executeConfidenceHook } from '../hooks/confidence_check';
 import { sendLineReply } from '../mcp/line';
 import { generateAIResponse } from './llm';
 import { searchKnowledge } from '../skills/knowledge_search';
+import { logInteraction } from '../utils/logger';
 
 /**
  * Core routing logic for incoming messages from all platforms (LINE, Notion, etc.)
@@ -21,7 +22,17 @@ export const processStandardMessage = async (msg: StandardMessage) => {
     // 1. 信頼度フックを実行し、CEOへのエスカレーション要否を判断
     const isSafeToSend = await executeConfidenceHook(msg.text, aiResponse.answer, aiResponse.confidence);
 
-    // 2. もしAIが自信を持っており(0.8以上)、かつLINEからの問い合わせであれば直接返答する
+    // [Logger] 会話ログを記録
+    await logInteraction({
+        user_id: msg.userId || 'unknown',
+        platform: (msg.source === 'line' ? 'line' : 'telegram'),
+        user_query: msg.text,
+        ai_response: aiResponse.answer,
+        confidence: aiResponse.confidence,
+        is_escalated: !isSafeToSend,
+    });
+
+    // 2. もしAIが自信を持っており(0.7以上)、かつLINEからの問い合わせであれば直接返答する
     if (isSafeToSend && msg.replyToken && msg.source === 'line') {
         console.log(`[ROUTER] Confidence high. Replying directly to user.`);
         await sendLineReply(msg.replyToken, aiResponse.answer);
