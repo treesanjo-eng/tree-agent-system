@@ -29,6 +29,6 @@ export const processStandardMessage = async (msg: StandardMessage) => {
     // 3. 自信がなくエスカレーションされた場合、ユーザーには「確認中」の旨を伝える
     else if (!isSafeToSend && msg.replyToken && msg.source === 'line') {
         console.log(`[ROUTER] Confidence low. Escalated to Telegram. Sending hold message to user.`);
-        await sendLineReply(msg.replyToken, `申し訳ありません、判断が難しいため中川代表へ確認・エスカレーションを行いました。\n\n[現在考えられている回答案]\n${aiResponse.answer}`);
+        await sendLineReply(msg.replyToken, `申し訳ありません。まだ私には判断ができない質問です🙇‍♂️\nこの質問は中川代表か社員の方に問い合わせてください。ただ数日後、私は成長しているかもしれないので次は答えれるかもです！`);
     }
 };
