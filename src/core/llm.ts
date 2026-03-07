@@ -37,7 +37,7 @@ export const generateAIResponse = async (question: string, contextKnowledge: str
 
     try {
         const response = await anthropic.messages.create({
-            model: 'claude-3-5-sonnet-20240620',
+            model: 'claude-sonnet-4-6',
             max_tokens: 1000,
             system: SYSTEM_PROMPT,
             messages: [
