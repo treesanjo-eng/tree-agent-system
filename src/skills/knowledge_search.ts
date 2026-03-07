@@ -110,7 +110,7 @@ function extractJapaneseKeywords(query: string): string[] {
     const keywords = cleaned
         .split('|')
         .map(w => w.trim())
-        .filter(w => w.length >= 1);
+        .filter(w => w.length >= 2 || (w.length === 1 && /[\u4E00-\u9FFF]/.test(w)));
 
     return [...new Set(keywords)]; // 重複を除去
 }
