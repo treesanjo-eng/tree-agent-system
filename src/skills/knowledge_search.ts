@@ -86,6 +86,9 @@ export const searchKnowledge = async (query: string): Promise<string> => {
 /**
  * 日本語テキストからキーワードを抽出する。
  * 形態素解析ライブラリを使わず、パターンベースで分割する。
+ * 
+ * ★改善(2026/3/12): 複合語（4文字以上）を2文字サブワードにも分割し、
+ * 「開店準備」→「開店」「準備」のように部分一致の検索カバレッジを向上。
  */
 function extractJapaneseKeywords(query: string): string[] {
     // Step 1: 記号を除去
@@ -112,5 +115,20 @@ function extractJapaneseKeywords(query: string): string[] {
         .map(w => w.trim())
         .filter(w => w.length >= 2 || (w.length === 1 && /[\u4E00-\u9FFF]/.test(w)));
 
-    return [...new Set(keywords)]; // 重複を除去
+    // Step 5: 長い複合語（4文字以上）を2文字ずつのサブワードにも分割
+    // 例: "開店準備" → ["開店", "準備"] を追加で生成
+    // これにより「開店準備」が見つからなくても「開店」「準備」で個別検索が可能
+    const subWords: string[] = [];
+    for (const kw of keywords) {
+        if (kw.length >= 4) {
+            for (let i = 0; i <= kw.length - 2; i += 2) {
+                const sub = kw.substring(i, i + 2);
+                if (sub.length === 2) {
+                    subWords.push(sub);
+                }
+            }
+        }
+    }
+
+    return [...new Set([...keywords, ...subWords])]; // 重複を除去
 }
