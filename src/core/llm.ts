@@ -62,8 +62,14 @@ export const generateAIResponse = async (question: string, contextKnowledge: str
 
         const responseText = (response.content[0] as any).text;
 
-        // Claudeが親切に ```json ... ``` で囲ってくる場合があるため、そのタグを取り除く
-        const cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        // Claudeが説明文などを混ぜてきた場合でもJSONを取り出せるようにする
+        let cleanedText = responseText;
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            cleanedText = jsonMatch[0];
+        } else {
+            cleanedText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        }
 
         try {
             const parsed = JSON.parse(cleanedText) as AIResponse;

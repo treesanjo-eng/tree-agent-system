@@ -36,7 +36,7 @@ export const searchKnowledge = async (query: string): Promise<string> => {
                 .from('company_knowledge')
                 .select('text_content')
                 .ilike('text_content', `%${keyword}%`)
-                .limit(10);
+                .limit(25);
 
             if (error) {
                 console.error(`[RAG] Search error for keyword "${keyword}":`, error);
@@ -61,8 +61,8 @@ export const searchKnowledge = async (query: string): Promise<string> => {
         // マッチ数が多い順にソート
         allResults.sort((a, b) => b.match_count - a.match_count);
 
-        // 上位8件を取得（複数セクションにまたがるマニュアルに対応）
-        const topResults = allResults.slice(0, 8);
+        // 上位15件を取得（複数セクションにまたがるマニュアルに漏れなく対応するため増加）
+        const topResults = allResults.slice(0, 15);
 
         console.log(`[RAG] Total unique results: ${topResults.length}`);
 
