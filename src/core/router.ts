@@ -3,7 +3,7 @@ import { executeConfidenceHook } from '../hooks/confidence_check';
 import { sendLineReply } from '../mcp/line';
 import { generateAIResponse } from './llm';
 import { searchKnowledge } from '../skills/knowledge_search';
-import { logInteraction } from '../utils/logger';
+import { logInteraction, getRecentInteractions } from '../utils/logger';
 
 /**
  * Core routing logic for incoming messages from all platforms (LINE, Notion, etc.)
@@ -15,8 +15,11 @@ export const processStandardMessage = async (msg: StandardMessage) => {
     // (フェーズ3-3) ナレッジベースから社内ルールを検索して文脈として取り出します。
     const contextKnowledge = await searchKnowledge(msg.text);
 
+    // 直近の会話履歴を取得し、文脈としてLLMに渡す (抽象的な質問や聞き返しの実現用)
+    const history = await getRecentInteractions(msg.userId || 'unknown', 4);
+
     console.log(`[ROUTER] 🧠 Asking Claude-4.6-Sonnet...`);
-    const aiResponse = await generateAIResponse(msg.text, contextKnowledge);
+    const aiResponse = await generateAIResponse(msg.text, contextKnowledge, history);
     console.log(`[ROUTER] Claude Response Confidence: ${aiResponse.confidence}`);
 
     // 1. 信頼度フックを実行し、CEOへのエスカレーション要否を判断
